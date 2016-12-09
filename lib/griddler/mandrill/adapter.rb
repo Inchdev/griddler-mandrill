@@ -15,7 +15,8 @@ module Griddler
           event[:spf].present? &&
           (event[:spf][:result] == 'pass' ||
             event[:spf][:result] == 'neutral' ||
-            event[:spf][:result] == 'none')
+            event[:spf][:result] == 'none' ||
+            event[:spf][:result] == 'softfail')
         end.map do |event|
           {
             to: recipients(:to, event),

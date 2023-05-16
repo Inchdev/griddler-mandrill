@@ -11,12 +11,27 @@ module Griddler
       end
 
       def normalize_params
-        events.select do |event|
-          event[:spf].present? &&
-          (event[:spf][:result] == 'pass' ||
-            event[:spf][:result] == 'neutral' ||
-            event[:spf][:result] == 'none' ||
-            event[:spf][:result] == 'softfail')
+        # reject event on confirmed SPF error
+        # or reject invalid DKIM signatures
+        #
+        # accept by default in case of payload regression
+        # https://mailchimp.com/developer/transactional/docs/webhooks/#detailed-webhook-format-responses
+        events.reject do |event|
+          # event[:spf] or event[:spf][:result] might be nil
+          # if an error occurred while checking SPF for the message
+          (
+            event[:spf].present? && (
+              # possible values for result are
+              # pass, neutral, fail, softfail, temperror, permerror, none
+              event[:spf][:result] == 'fail' ||
+              event[:spf][:result] == 'temperror' ||
+              event[:spf][:result] == 'permerror'
+            )
+          ) || (
+            event[:dkim].present? &&
+            event[:dkim][:signed] == true &&
+            event[:dkim][:valid] == false
+          )
         end.map do |event|
           {
             to: recipients(:to, event),

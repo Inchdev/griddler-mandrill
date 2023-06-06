@@ -27,11 +27,13 @@ module Griddler
               event[:spf][:result] == 'temperror' ||
               event[:spf][:result] == 'permerror'
             )
-          ) || (
-            event[:dkim].present? &&
-            event[:dkim][:signed] == true &&
-            event[:dkim][:valid] == false
           )
+          # Orange and Wanadoo senders might fail to send a valid DKIM signature
+          # || (
+          #   event[:dkim].present? &&
+          #   event[:dkim][:signed] == true &&
+          #   event[:dkim][:valid] == false
+          # )
         end.map do |event|
           {
             to: recipients(:to, event),

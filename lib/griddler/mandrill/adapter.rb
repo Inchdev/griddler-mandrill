@@ -35,11 +35,15 @@ module Griddler
           #   event[:dkim][:valid] == false
           # )
         end.map do |event|
+          extra_headers = {}
+          if event[:mandrill_event].keys?(:ts)
+            extra_headers['X-Griddler-MandrillEvent-Timestamp'] = event[:mandrill_event][:ts]
+          end
           {
             to: recipients(:to, event),
             cc: recipients(:cc, event),
             bcc: resolve_bcc(event),
-            headers: event[:headers],
+            headers: event[:headers].merge(extra_headers),
             from: full_email([ event[:from_email], event[:from_name] ]),
             subject: event[:subject],
             text: event[:text] || '',
@@ -47,7 +51,7 @@ module Griddler
             raw_body: event[:raw_msg],
             attachments: attachment_files(event),
             email: event[:email], # the email address where Mandrill received the message
-            spam_report: event[:spam_report]
+            spam_report: event[:spam_report],
           }
         end
       end
@@ -57,9 +61,16 @@ module Griddler
       attr_reader :params
 
       def events
-        @events ||= ActiveSupport::JSON.decode(params[:mandrill_events]).map { |event|
-          event['msg'].with_indifferent_access if event['event'] == 'inbound'
-        }.compact
+        return @events if defined?(@events)
+
+        mandrill_events = ActiveSupport::JSON.decode(params[:mandrill_events])
+        inbound_message_events = mandrill_events.select { |event| event.fetch('event') == 'inbound' }
+
+        @events = inbound_message_events.map do |event|
+          msg = event.fetch('msg')
+          msg['mandrill_event'] = event.except('msg')
+          msg.with_indifferent_access
+        end
       end
 
       def recipients(field, event)
